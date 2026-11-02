@@ -36,7 +36,7 @@ jobs:
         run: |
           dir="variants/$VARIANT"
           [ -f "$dir/myoptions.h" ] || { echo "::error::$dir/myoptions.h not found. Available: $(ls variants | tr '\n' ' ')"; exit 1; }
-          CHIP=esp32; PARTITION=default
+          CHIP=esp32; PARTITION=min_spiffs
           [ -f "$dir/variant.env" ] && source "$dir/variant.env"
           case "$CHIP" in
             esp32)   echo "FQBN=esp32:esp32:esp32:PartitionScheme=$PARTITION" >> "$GITHUB_ENV" ;;
