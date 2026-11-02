@@ -1,0 +1,127 @@
+name: Build firmware & web flasher
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: "Variant name = folder in variants/ (contains myoptions.h)"
+        required: true
+        default: esp32-i2s-dummy
+        type: string
+
+env:
+  ESP32_CORE_VERSION: "3.2.0"   # arduino-esp32 core
+  MKSPIFFS_URL: https://github.com/igrr/mkspiffs/releases/download/0.2.3/mkspiffs-0.2.3-arduino-esp32-linux64.tar.gz
+
+permissions:
+  contents: write   # push to gh-pages
+
+concurrency:
+  group: pages-publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VARIANT: ${{ inputs.variant }}
+    steps:
+      - name: Validate variant name
+        run: |
+          [[ "$VARIANT" =~ ^[A-Za-z0-9._-]+$ && "$VARIANT" != .* ]] || { echo "::error::Invalid variant name"; exit 1; }
+
+      - uses: actions/checkout@v4
+
+      - name: Load variant settings
+        run: |
+          dir="variants/$VARIANT"
+          [ -f "$dir/myoptions.h" ] || { echo "::error::$dir/myoptions.h not found. Available: $(ls variants | tr '\n' ' ')"; exit 1; }
+          CHIP=esp32; PARTITION=default
+          [ -f "$dir/variant.env" ] && source "$dir/variant.env"
+          case "$CHIP" in
+            esp32)   echo "FQBN=esp32:esp32:esp32:PartitionScheme=$PARTITION" >> "$GITHUB_ENV" ;;
+            esp32s3) echo "FQBN=esp32:esp32:esp32s3:PartitionScheme=$PARTITION" >> "$GITHUB_ENV" ;;
+            *) echo "::error::Unsupported CHIP '$CHIP'"; exit 1 ;;
+          esac
+          echo "CHIP=$CHIP" >> "$GITHUB_ENV"
+          echo "PARTITION=$PARTITION" >> "$GITHUB_ENV"
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.arduino15
+            ~/Arduino/libraries
+          key: arduino-${{ env.ESP32_CORE_VERSION }}-${{ hashFiles('.github/workflows/build-flasher.yml') }}
+
+      - name: Install core and libraries
+        run: |
+          arduino-cli config init --overwrite
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install "esp32:esp32@${ESP32_CORE_VERSION}"
+          arduino-cli lib install "Adafruit GFX Library" "Adafruit BusIO" \
+            "Adafruit ST7735 and ST7789 Library" "Adafruit SSD1306" "Adafruit SSD1305" \
+            "Adafruit SSD1327" "Adafruit SH110X" "Adafruit PCD8544 Nokia 5110 LCD library" \
+            "Adafruit ILI9341" "XPT2046_Touchscreen" "RTClib" "LiquidCrystal"
+          # yoRadio requires its own glcdfont.c in Adafruit_GFX
+          cp yoRadio/fonts/glcdfont.c "$HOME/Arduino/libraries/Adafruit_GFX_Library/glcdfont.c"
+
+      - name: Compile
+        run: |
+          cp "variants/$VARIANT/myoptions.h" yoRadio/myoptions.h
+          arduino-cli compile --fqbn "$FQBN" --output-dir out/build yoRadio
+
+      - name: Build SPIFFS image and collect binaries
+        run: |
+          set -euo pipefail
+          out="out/$VARIANT"; mkdir -p "$out"
+          tools=$(dirname "$(find "$HOME/.arduino15/packages/esp32/hardware/esp32/$ESP32_CORE_VERSION/tools/partitions" -name boot_app0.bin | head -1)")
+          cp out/build/yoRadio.ino.bootloader.bin "$out/bootloader.bin"
+          cp out/build/yoRadio.ino.partitions.bin "$out/partitions.bin"
+          cp out/build/yoRadio.ino.bin            "$out/firmware.bin"
+          cp "$tools/boot_app0.bin"               "$out/boot_app0.bin"
+
+          # SPIFFS offset/size from the selected partition scheme
+          read -r offset size < <(python3 - "$tools/$PARTITION.csv" <<'PY'
+          import csv, sys
+          for row in csv.reader(l for l in open(sys.argv[1]) if not l.startswith('#')):
+              row = [c.strip() for c in row]
+              if len(row) > 4 and row[2] == 'spiffs':
+                  print(row[3], int(row[4], 0))
+                  break
+          else:
+              sys.exit('no spiffs partition in scheme')
+          PY
+          )
+          curl -fsSL "$MKSPIFFS_URL" | tar xz
+          ./mkspiffs-*/mkspiffs -c yoRadio/data -b 4096 -p 256 -s "$size" "$out/spiffs.bin"
+
+          python3 .github/scripts/make_manifest.py "$out" "$VARIANT" "$CHIP" "$offset" "${GITHUB_SHA::7}"
+          rm -rf out/build
+          ls -la "$out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yoradio-${{ inputs.variant }}
+          path: out/${{ inputs.variant }}
+
+      - name: Publish to gh-pages
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then
+            git clone --depth 1 --branch gh-pages "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" site
+          else
+            git init -b gh-pages site
+            git -C site remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          fi
+          rm -rf "site/$VARIANT"; cp -r "out/$VARIANT" "site/$VARIANT"
+          touch site/.nojekyll
+          python3 .github/scripts/make_index.py site
+          cd site
+          git add -A
+          git commit -m "flasher: $VARIANT @ ${GITHUB_SHA::7}"
+          git push origin gh-pages
