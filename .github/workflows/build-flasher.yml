@@ -10,7 +10,7 @@ on:
         type: string
 
 env:
-  ESP32_CORE_VERSION: "3.2.0"   # arduino-esp32 core
+  ESP32_CORE_VERSION: "2.0.17"  # default arduino-esp32 core (3.x: legacy I2S vs new ADC driver abort)
   MKSPIFFS_URL: https://github.com/igrr/mkspiffs/releases/download/0.2.3/mkspiffs-0.2.3-arduino-esp32-linux64.tar.gz
 
 permissions:
@@ -36,7 +36,7 @@ jobs:
         run: |
           dir="variants/$VARIANT"
           [ -f "$dir/myoptions.h" ] || { echo "::error::$dir/myoptions.h not found. Available: $(ls variants | tr '\n' ' ')"; exit 1; }
-          CHIP=esp32; PARTITION=min_spiffs
+          CHIP=esp32; PARTITION=min_spiffs; CORE_VERSION="$ESP32_CORE_VERSION"
           [ -f "$dir/variant.env" ] && source "$dir/variant.env"
           case "$CHIP" in
             esp32)   echo "FQBN=esp32:esp32:esp32:PartitionScheme=$PARTITION" >> "$GITHUB_ENV" ;;
@@ -44,6 +44,7 @@ jobs:
             *) echo "::error::Unsupported CHIP '$CHIP'"; exit 1 ;;
           esac
           echo "CHIP=$CHIP" >> "$GITHUB_ENV"
+          echo "ESP32_CORE_VERSION=$CORE_VERSION" >> "$GITHUB_ENV"
           echo "PARTITION=$PARTITION" >> "$GITHUB_ENV"
 
       - uses: arduino/setup-arduino-cli@v2
