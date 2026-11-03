@@ -21,7 +21,7 @@
 #define TS_SPIPINS 25, 39, 32 /* SCK, MISO, MOSI */
 #define LIGHT_SENSOR 34
 #define AUTOBACKLIGHT_MAX 1024
-#define IR_PIN         21       // Pin de señal conectado a IO3 en conector P1
+#define IR_PIN         35       // Pin de señal conectado a IO3 en conector P1
 //#define SD_HSPI false // VSPI (SCK-18, MISO-19, MOSI-23)
 //#define SDC_CS 5
 
