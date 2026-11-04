@@ -124,5 +124,6 @@ jobs:
           python3 .github/scripts/make_index.py site
           cd site
           git add -A
+          if git diff --cached --quiet; then echo "Flasher already up to date"; exit 0; fi
           git commit -m "flasher: $VARIANT @ ${GITHUB_SHA::7}"
           git push origin gh-pages
