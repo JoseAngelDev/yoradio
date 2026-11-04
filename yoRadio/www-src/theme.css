@@ -1,0 +1,62 @@
+/* Light theme is the default. Dark follows the phone until the user picks one (data-theme on <html>). */
+:root {
+--main-bg-color:        #f6f6f3;
+--main-text-color:      #3b3b37;
+--main-hl-color:        #111111;
+--odd-bg-color:         #ecece7;
+--accent-color:         #111111;
+--accent-dark:          #111111;
+--accent-text-color:    #ffffff;
+--input-border:         #c9c9c2;
+--logo:                 #111111;
+--logo-red:             #e5251c;
+--logo-shadow:          #111111;
+--playlist-hover:       #e4e4de;
+--section-gradient:     #f6f6f3;
+--section-border:       #c9c9c2;
+--heapbar-color:        #e5251c;
+--action-color:         #e5251c;
+--action-text:          #ffffff;
+--track-bg:             #d4d4cf;
+--error-color:          #c4160d;
+}
+@media (prefers-color-scheme: dark) {
+:root:not([data-theme="light"]) {
+--main-bg-color:        #10100f;
+--main-text-color:      #bcbcb6;
+--main-hl-color:        #f4f4f0;
+--odd-bg-color:         #1a1a18;
+--accent-color:         #f4f4f0;
+--accent-dark:          #f4f4f0;
+--accent-text-color:    #10100f;
+--input-border:         #3a3a35;
+--logo:                 #f4f4f0;
+--logo-shadow:          #f4f4f0;
+--playlist-hover:       #242421;
+--section-gradient:     #10100f;
+--section-border:       #3a3a35;
+--action-color:         #ff4a3d;
+--action-text:          #10100f;
+--track-bg:             #34342f;
+--error-color:          #ff6b61;
+}
+}
+:root[data-theme="dark"] {
+--main-bg-color:        #10100f;
+--main-text-color:      #bcbcb6;
+--main-hl-color:        #f4f4f0;
+--odd-bg-color:         #1a1a18;
+--accent-color:         #f4f4f0;
+--accent-dark:          #f4f4f0;
+--accent-text-color:    #10100f;
+--input-border:         #3a3a35;
+--logo:                 #f4f4f0;
+--logo-shadow:          #f4f4f0;
+--playlist-hover:       #242421;
+--section-gradient:     #10100f;
+--section-border:       #3a3a35;
+--action-color:         #ff4a3d;
+--action-text:          #10100f;
+--track-bg:             #34342f;
+--error-color:          #ff6b61;
+}
